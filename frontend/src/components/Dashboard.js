@@ -18,7 +18,7 @@ function Dashboard({ password, onLogout }) {
   useEffect(() => {
     fetchCategories();
     fetchReceipts();
-  }, []);
+    }, [password, apiUrl]);
 
   const fetchCategories = async () => {
     try {
