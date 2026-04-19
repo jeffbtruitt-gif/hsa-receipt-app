@@ -12,14 +12,8 @@ function Dashboard({ password, onLogout }) {
     category: '',
     vendorSearch: '',
   });
-// eslint-disable-next-line react-hooks/exhaustive-deps
+
   const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-
-
-  useEffect(() => {
-    fetchCategories();
-    fetchReceipts();
-    }, [password, apiUrl]);
 
   const fetchCategories = async () => {
     try {
@@ -50,6 +44,11 @@ function Dashboard({ password, onLogout }) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchCategories();
+    fetchReceipts();
+  }, []);
 
   const handleUploadSuccess = () => {
     fetchReceipts(filters);
