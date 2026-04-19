@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import UploadForm from './UploadForm';
 import ReceiptList from './ReceiptList';
 
-/* eslint-disable react-hooks/exhaustive-deps */
-
 function Dashboard({ password, onLogout }) {
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -17,28 +15,50 @@ function Dashboard({ password, onLogout }) {
 
   const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch(`${apiUrl}/api/categories?password=${password}`);
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data);
+  // Fetch categories on mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/api/categories?password=${password}`);
+        if (response.ok) {
+          const data = await response.json();
+          setCategories(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch categories:', err);
       }
-    } catch (err) {
-      console.error('Failed to fetch categories:', err);
-    }
-  };
+    };
+    
+    const fetchReceipts = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({ password });
+        const response = await fetch(`${apiUrl}/api/receipts?${params}`);
+        if (response.ok) {
+          const data = await response.json();
+          setReceipts(data);
+        } else if (response.status === 401) {
+          onLogout();
+        }
+      } catch (err) {
+        console.error('Failed to fetch receipts:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const fetchReceipts = async (filterParams = {}) => {
+    fetchCategories();
+    fetchReceipts();
+  }, [password, apiUrl, onLogout]);
+
+  const handleUploadSuccess = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ password, ...filterParams });
+      const params = new URLSearchParams({ password, ...filters });
       const response = await fetch(`${apiUrl}/api/receipts?${params}`);
       if (response.ok) {
         const data = await response.json();
         setReceipts(data);
-      } else if (response.status === 401) {
-        onLogout();
       }
     } catch (err) {
       console.error('Failed to fetch receipts:', err);
@@ -47,18 +67,21 @@ function Dashboard({ password, onLogout }) {
     }
   };
 
-  useEffect(() => {
-    fetchCategories();
-    fetchReceipts();
-  }, []);
-
-  const handleUploadSuccess = () => {
-    fetchReceipts(filters);
-  };
-
-  const handleFilterChange = (newFilters) => {
+  const handleFilterChange = async (newFilters) => {
     setFilters(newFilters);
-    fetchReceipts(newFilters);
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ password, ...newFilters });
+      const response = await fetch(`${apiUrl}/api/receipts?${params}`);
+      if (response.ok) {
+        const data = await response.json();
+        setReceipts(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch receipts:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDelete = async (id) => {
@@ -70,7 +93,14 @@ function Dashboard({ password, onLogout }) {
         body: JSON.stringify({ password }),
       });
       if (response.ok) {
-        fetchReceipts(filters);
+        setLoading(true);
+        const params = new URLSearchParams({ password, ...filters });
+        const fetchResponse = await fetch(`${apiUrl}/api/receipts?${params}`);
+        if (fetchResponse.ok) {
+          const data = await fetchResponse.json();
+          setReceipts(data);
+        }
+        setLoading(false);
       }
     } catch (err) {
       console.error('Failed to delete receipt:', err);
