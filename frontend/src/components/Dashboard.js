@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import UploadForm from './UploadForm';
 import ReceiptList from './ReceiptList';
 
+/* eslint-disable react-hooks/exhaustive-deps */
+
 function Dashboard({ password, onLogout }) {
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(false);
