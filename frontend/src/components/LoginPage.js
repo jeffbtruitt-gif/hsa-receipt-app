@@ -11,7 +11,7 @@ function LoginPage({ onLogin, error }) {
   return (
     <div className="login-container">
       <div className="login-box">
-        <h1>HSA Receipt Vault</h1>
+        <img src="/logo.png" alt="HSA Receipt Vault" className="login-logo" />
         <p>Secure Financial Records</p>
         <form onSubmit={handleSubmit}>
           <input
