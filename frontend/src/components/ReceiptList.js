@@ -1,30 +1,20 @@
-import React, { useState } from 'react';
-import ReceiptDetail from './ReceiptDetail';
+import React from 'react';
 
-function ReceiptList({ receipts, loading, categories, filters, onFilterChange, onDelete }) {
-  const [selectedReceipt, setSelectedReceipt] = useState(null);
-
+function ReceiptList({ receipts, loading, categories, filters, onFilterChange, onDelete, onSelectReceipt, onToggleReimbursed }) {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     const newFilters = { ...filters, [name]: value };
     onFilterChange(newFilters);
   };
 
-  if (selectedReceipt) {
-    return <ReceiptDetail receipt={selectedReceipt} onBack={() => setSelectedReceipt(null)} />;
-  }
-
-  const totalAmount = receipts.reduce((sum, r) => sum + r.amount, 0);
-  const categoryTotals = {};
-  receipts.forEach((r) => {
-    if (r.category) {
-      categoryTotals[r.category] = (categoryTotals[r.category] || 0) + r.amount;
-    }
-  });
+  const nonReimbursedReceipts = receipts.filter(r => !r.is_reimbursed);
+  const totalAmount = nonReimbursedReceipts.reduce((sum, r) => sum + parseFloat(r.amount), 0);
 
   return (
     <div className="receipt-list">
-      <h2>Your Receipts</h2>
+      <div className="page-header">
+        <h1>Your Receipts</h1>
+      </div>
 
       <div className="filters">
         <input
@@ -44,9 +34,7 @@ function ReceiptList({ receipts, loading, categories, filters, onFilterChange, o
         <select name="category" value={filters.category} onChange={handleFilterChange}>
           <option value="">All categories</option>
           {categories.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
-            </option>
+            <option key={cat} value={cat}>{cat}</option>
           ))}
         </select>
         <input
@@ -66,27 +54,18 @@ function ReceiptList({ receipts, loading, categories, filters, onFilterChange, o
         <>
           <div className="summary">
             <div className="summary-item">
-              <span>Total:</span>
+              <span>Pending Total:</span>
               <strong>${totalAmount.toFixed(2)}</strong>
             </div>
             <div className="summary-item">
-              <span>Count:</span>
+              <span>Total Receipts:</span>
               <strong>{receipts.length}</strong>
             </div>
-          </div>
-
-          {Object.keys(categoryTotals).length > 0 && (
-            <div className="category-breakdown">
-              <h3>By Category</h3>
-              <ul>
-                {Object.entries(categoryTotals).map(([cat, total]) => (
-                  <li key={cat}>
-                    {cat}: <strong>${total.toFixed(2)}</strong>
-                  </li>
-                ))}
-              </ul>
+            <div className="summary-item">
+              <span>Pending:</span>
+              <strong>{nonReimbursedReceipts.length}</strong>
             </div>
-          )}
+          </div>
 
           <div className="receipts-table">
             <table>
@@ -96,22 +75,37 @@ function ReceiptList({ receipts, loading, categories, filters, onFilterChange, o
                   <th>Vendor</th>
                   <th>Category</th>
                   <th>Amount</th>
+                  <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {receipts.map((receipt) => (
-                  <tr key={receipt.id} onClick={() => setSelectedReceipt(receipt)} className="clickable">
+                  <tr 
+                    key={receipt.id} 
+                    onClick={() => onSelectReceipt(receipt)} 
+                    className={`clickable ${receipt.is_reimbursed ? 'reimbursed-row' : ''}`}
+                  >
                     <td>{new Date(receipt.expense_date).toLocaleDateString()}</td>
                     <td>{receipt.vendor_name}</td>
                     <td>{receipt.category || '—'}</td>
-                    <td>${receipt.amount.toFixed(2)}</td>
+                    <td>${parseFloat(receipt.amount).toFixed(2)}</td>
                     <td>
+                      {receipt.is_reimbursed ? (
+                        <span className="status-reimbursed">✓ Reimbursed</span>
+                      ) : (
+                        <span className="status-pending">Pending</span>
+                      )}
+                    </td>
+                    <td onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDelete(receipt.id);
-                        }}
+                        onClick={() => onToggleReimbursed(receipt.id, receipt.is_reimbursed)}
+                        className="toggle-btn"
+                      >
+                        {receipt.is_reimbursed ? 'Mark Pending' : 'Mark Reimbursed'}
+                      </button>
+                      <button
+                        onClick={() => onDelete(receipt.id)}
                         className="delete-btn"
                       >
                         Delete
