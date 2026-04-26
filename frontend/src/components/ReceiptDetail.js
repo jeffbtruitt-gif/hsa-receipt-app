@@ -1,7 +1,8 @@
 import React from 'react';
 
 function ReceiptDetail({ receipt, onBack }) {
-  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const isPdf = receipt.file_name && receipt.file_name.toLowerCase().endsWith('.pdf');
+  const isImage = receipt.file_name && /\.(jpg|jpeg|png|gif|webp)$/i.test(receipt.file_name);
 
   return (
     <div className="receipt-detail">
@@ -39,9 +40,46 @@ function ReceiptDetail({ receipt, onBack }) {
         </div>
 
         <div className="detail-image">
-          <h3>Receipt Image</h3>
+          <h3>Receipt File</h3>
           {receipt.storage_path && (
-            <img src={`${apiUrl}${receipt.storage_path}`} alt="Receipt" className="receipt-image" />
+            <>
+              {isImage && (
+                <img src={receipt.storage_path} alt="Receipt" className="receipt-image" />
+              )}
+              {isPdf && (
+                <div className="pdf-preview">
+                  <iframe
+                    src={receipt.storage_path}
+                    width="100%"
+                    height="600px"
+                    title="Receipt PDF"
+                    style={{ border: '1px solid #ddd', borderRadius: '4px' }}
+                  />
+                  <p style={{ marginTop: '10px' }}>
+                    <a 
+                      href={receipt.storage_path} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      style={{ color: '#5D3A3A', textDecoration: 'underline' }}
+                    >
+                      Open PDF in new tab
+                    </a>
+                  </p>
+                </div>
+              )}
+              {!isImage && !isPdf && (
+                <p>
+                  <a 
+                    href={receipt.storage_path} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{ color: '#5D3A3A', textDecoration: 'underline' }}
+                  >
+                    Download {receipt.file_name}
+                  </a>
+                </p>
+              )}
+            </>
           )}
         </div>
       </div>
