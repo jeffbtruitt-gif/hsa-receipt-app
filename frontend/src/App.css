@@ -1,8 +1,8 @@
 /* HSA Receipt Vault - Luxury Burgundy Theme */
 
 :root {
-  --hsa-navy: #1a2942;
-  --hsa-navy-deep: #0f1a2e;
+  --hsa-navy: #0F1F3F;
+  --hsa-navy-deep: #081530;
   --hsa-gold: #C9A961;
   --hsa-gold-soft: #E4CD8C;
   --hsa-gold-deep: #8B7635;
@@ -137,7 +137,7 @@ body {
 /* Sidebar */
 .sidebar {
   width: 260px;
-  background: var(--hsa-navy);
+  background: #0F1F3F;
   color: var(--hsa-white);
   display: flex;
   flex-direction: column;
@@ -150,11 +150,11 @@ body {
 }
 
 .sidebar-header {
-  padding: 0 24px 24px 24px;
+  padding: 0 20px 24px 20px;
   border-bottom: 1px solid rgba(201, 169, 97, 0.2);
   margin-bottom: 24px;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .sidebar-logo {
