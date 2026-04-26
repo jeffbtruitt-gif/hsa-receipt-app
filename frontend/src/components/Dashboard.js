@@ -3,6 +3,7 @@ import DashboardHome from './DashboardHome';
 import UploadForm from './UploadForm';
 import ReceiptList from './ReceiptList';
 import ReceiptDetail from './ReceiptDetail';
+import HSAAccounts from './HSAAccounts';
 
 // Icon components
 const DashboardIcon = () => (
@@ -11,6 +12,13 @@ const DashboardIcon = () => (
     <rect x="14" y="3" width="7" height="7"></rect>
     <rect x="14" y="14" width="7" height="7"></rect>
     <rect x="3" y="14" width="7" height="7"></rect>
+  </svg>
+);
+
+const AccountsIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+    <line x1="2" y1="10" x2="22" y2="10"></line>
   </svg>
 );
 
@@ -165,18 +173,8 @@ function Dashboard({ password, onLogout }) {
     }
   };
 
-  const navigateToUpload = () => {
-    setCurrentPage('upload');
-    setSelectedReceipt(null);
-  };
-
-  const navigateToDashboard = () => {
-    setCurrentPage('dashboard');
-    setSelectedReceipt(null);
-  };
-
-  const navigateToReceipts = () => {
-    setCurrentPage('receipts');
+  const navigateTo = (page) => {
+    setCurrentPage(page);
     setSelectedReceipt(null);
   };
 
@@ -191,7 +189,7 @@ function Dashboard({ password, onLogout }) {
         
         <nav className="sidebar-nav">
           <button
-            onClick={navigateToDashboard}
+            onClick={() => navigateTo('dashboard')}
             className={`nav-item ${currentPage === 'dashboard' ? 'active' : ''}`}
           >
             <span className="nav-icon"><DashboardIcon /></span>
@@ -199,7 +197,15 @@ function Dashboard({ password, onLogout }) {
           </button>
           
           <button
-            onClick={navigateToReceipts}
+            onClick={() => navigateTo('hsa-accounts')}
+            className={`nav-item ${currentPage === 'hsa-accounts' ? 'active' : ''}`}
+          >
+            <span className="nav-icon"><AccountsIcon /></span>
+            <span>HSA Accounts</span>
+          </button>
+          
+          <button
+            onClick={() => navigateTo('receipts')}
             className={`nav-item ${currentPage === 'receipts' ? 'active' : ''}`}
           >
             <span className="nav-icon"><ReceiptsIcon /></span>
@@ -207,7 +213,7 @@ function Dashboard({ password, onLogout }) {
           </button>
           
           <button
-            onClick={navigateToUpload}
+            onClick={() => navigateTo('upload')}
             className={`nav-item ${currentPage === 'upload' ? 'active' : ''}`}
           >
             <span className="nav-icon"><UploadIcon /></span>
@@ -236,9 +242,11 @@ function Dashboard({ password, onLogout }) {
         ) : currentPage === 'dashboard' ? (
           <DashboardHome 
             stats={stats} 
-            onNavigateToUpload={navigateToUpload}
+            onNavigateToUpload={() => navigateTo('upload')}
             onSelectReceipt={setSelectedReceipt}
           />
+        ) : currentPage === 'hsa-accounts' ? (
+          <HSAAccounts password={password} />
         ) : currentPage === 'upload' ? (
           <UploadForm 
             password={password} 
