@@ -26,13 +26,11 @@ cloudinary.config({
 app.use(cors());
 app.use(express.json());
 
-// File upload setup - using memory storage for Cloudinary
 const upload = multer({ 
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// Verify password middleware
 const verifyPassword = (req, res, next) => {
   const password = req.body?.password || req.query?.password;
   if (password === APP_PASSWORD) {
@@ -42,14 +40,9 @@ const verifyPassword = (req, res, next) => {
   }
 };
 
-// Helper: Upload file to Cloudinary
-// PDFs are uploaded as 'image' type to allow inline preview
 const uploadToCloudinary = (buffer, originalName) => {
   return new Promise((resolve, reject) => {
     const isPdf = originalName.match(/\.pdf$/i);
-    
-    // Upload PDFs as 'image' type so they can be displayed inline
-    // This works because Cloudinary treats PDFs specially when uploaded as image
     const resourceType = 'image';
     
     const uploadStream = cloudinary.uploader.upload_stream(
@@ -58,7 +51,6 @@ const uploadToCloudinary = (buffer, originalName) => {
         folder: 'hsa-receipts',
         public_id: `${Date.now()}-${uuidv4()}`,
         use_filename: false,
-        // For PDFs, set format to ensure proper handling
         ...(isPdf && { format: 'pdf' }),
       },
       (error, result) => {
@@ -72,12 +64,9 @@ const uploadToCloudinary = (buffer, originalName) => {
 
 // Routes
 
-// POST /api/login
 app.post('/api/login', (req, res) => {
   const { password } = req.body;
-  if (!password) {
-    return res.status(400).json({ error: 'Password required' });
-  }
+  if (!password) return res.status(400).json({ error: 'Password required' });
   if (password === APP_PASSWORD) {
     res.json({ success: true, token: 'authenticated' });
   } else {
@@ -85,19 +74,16 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-// POST /api/receipts - Upload receipt
 app.post('/api/receipts', upload.single('file'), verifyPassword, async (req, res) => {
   try {
-    const { vendor_name, amount, expense_date, category, notes } = req.body;
+    const { vendor_name, amount, expense_date, category, notes, is_reimbursed } = req.body;
 
     if (!req.file || !vendor_name || !amount || !expense_date) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Upload file to Cloudinary
     const cloudinaryResult = await uploadToCloudinary(req.file.buffer, req.file.originalname);
 
-    // Save metadata to Supabase
     const { data, error } = await supabase
       .from('receipts')
       .insert([{
@@ -108,6 +94,7 @@ app.post('/api/receipts', upload.single('file'), verifyPassword, async (req, res
         notes: notes || null,
         file_name: req.file.originalname,
         storage_path: cloudinaryResult.secure_url,
+        is_reimbursed: is_reimbursed === 'true' || is_reimbursed === true,
       }])
       .select();
 
@@ -123,10 +110,9 @@ app.post('/api/receipts', upload.single('file'), verifyPassword, async (req, res
   }
 });
 
-// GET /api/receipts - List receipts with filters
 app.get('/api/receipts', verifyPassword, async (req, res) => {
   try {
-    const { startDate, endDate, category, vendorSearch } = req.query;
+    const { startDate, endDate, category, vendorSearch, includeReimbursed } = req.query;
 
     let query = supabase
       .from('receipts')
@@ -152,7 +138,6 @@ app.get('/api/receipts', verifyPassword, async (req, res) => {
   }
 });
 
-// GET /api/receipts/:id - Get single receipt
 app.get('/api/receipts/:id', verifyPassword, async (req, res) => {
   try {
     const { id } = req.params;
@@ -162,56 +147,127 @@ app.get('/api/receipts/:id', verifyPassword, async (req, res) => {
       .eq('id', id)
       .single();
 
-    if (error || !data) {
-      return res.status(404).json({ error: 'Receipt not found' });
-    }
-
+    if (error || !data) return res.status(404).json({ error: 'Receipt not found' });
     res.json(data);
   } catch (err) {
-    console.error('Fetch error:', err);
     res.status(500).json({ error: 'Failed to fetch receipt' });
   }
 });
 
-// DELETE /api/receipts/:id - Delete receipt
+// PUT /api/receipts/:id - Update receipt (for marking reimbursed)
+app.put('/api/receipts/:id', verifyPassword, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { is_reimbursed, vendor_name, amount, expense_date, category, notes } = req.body;
+    
+    const updates = {};
+    if (is_reimbursed !== undefined) updates.is_reimbursed = is_reimbursed;
+    if (vendor_name !== undefined) updates.vendor_name = vendor_name;
+    if (amount !== undefined) updates.amount = parseFloat(amount);
+    if (expense_date !== undefined) updates.expense_date = expense_date;
+    if (category !== undefined) updates.category = category;
+    if (notes !== undefined) updates.notes = notes;
+
+    const { data, error } = await supabase
+      .from('receipts')
+      .update(updates)
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      console.error('Update error:', error);
+      return res.status(500).json({ error: 'Failed to update' });
+    }
+
+    res.json(data[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update' });
+  }
+});
+
 app.delete('/api/receipts/:id', verifyPassword, async (req, res) => {
   try {
     const { id } = req.params;
-
     const { data: receipt, error: fetchError } = await supabase
       .from('receipts')
       .select('*')
       .eq('id', id)
       .single();
 
-    if (fetchError || !receipt) {
-      return res.status(404).json({ error: 'Receipt not found' });
-    }
+    if (fetchError || !receipt) return res.status(404).json({ error: 'Receipt not found' });
 
     const { error: deleteError } = await supabase
       .from('receipts')
       .delete()
       .eq('id', id);
 
-    if (deleteError) {
-      console.error('Delete error:', deleteError);
-      return res.status(500).json({ error: 'Failed to delete' });
-    }
-
+    if (deleteError) return res.status(500).json({ error: 'Failed to delete' });
     res.json({ message: 'Receipt deleted' });
   } catch (err) {
-    console.error('Delete error:', err);
     res.status(500).json({ error: 'Failed to delete' });
   }
 });
 
-// GET /api/categories
 app.get('/api/categories', verifyPassword, (req, res) => {
   const categories = ['Medical', 'Dental', 'Pharmacy', 'Vision', 'Mental Health', 'Physical Therapy', 'Chiropractic', 'Other'];
   res.json(categories);
 });
 
-// GET /api/export
+// GET /api/stats - Dashboard statistics
+app.get('/api/stats', verifyPassword, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('receipts')
+      .select('*')
+      .order('expense_date', { ascending: false });
+
+    if (error) return res.status(500).json({ error: 'Failed to fetch stats' });
+
+    const receipts = data || [];
+    const nonReimbursed = receipts.filter(r => !r.is_reimbursed);
+    
+    const currentYear = new Date().getFullYear();
+    const thisYearReceipts = nonReimbursed.filter(r => 
+      new Date(r.expense_date).getFullYear() === currentYear
+    );
+
+    // Monthly totals (current year)
+    const monthlyTotals = {};
+    for (let m = 0; m < 12; m++) {
+      monthlyTotals[m] = 0;
+    }
+    thisYearReceipts.forEach(r => {
+      const month = new Date(r.expense_date).getMonth();
+      monthlyTotals[month] += parseFloat(r.amount);
+    });
+
+    // Yearly totals
+    const yearlyTotals = {};
+    nonReimbursed.forEach(r => {
+      const year = new Date(r.expense_date).getFullYear();
+      yearlyTotals[year] = (yearlyTotals[year] || 0) + parseFloat(r.amount);
+    });
+
+    const totalAllTime = nonReimbursed.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+    const totalThisYear = thisYearReceipts.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+
+    res.json({
+      total_count: receipts.length,
+      non_reimbursed_count: nonReimbursed.length,
+      reimbursed_count: receipts.length - nonReimbursed.length,
+      total_all_time: totalAllTime,
+      total_this_year: totalThisYear,
+      monthly_totals: monthlyTotals,
+      yearly_totals: yearlyTotals,
+      recent_receipts: receipts.slice(0, 5),
+      current_year: currentYear,
+    });
+  } catch (err) {
+    console.error('Stats error:', err);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
 app.get('/api/export', verifyPassword, async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -219,27 +275,15 @@ app.get('/api/export', verifyPassword, async (req, res) => {
       .select('*')
       .order('expense_date', { ascending: false });
 
-    if (error) {
-      return res.status(500).json({ error: 'Failed to export' });
-    }
-
-    res.json({
-      exported_at: new Date().toISOString(),
-      receipts: data || [],
-    });
+    if (error) return res.status(500).json({ error: 'Failed to export' });
+    res.json({ exported_at: new Date().toISOString(), receipts: data || [] });
   } catch (err) {
     res.status(500).json({ error: 'Export failed' });
   }
 });
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
+app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
-// Start server
 app.listen(PORT, () => {
   console.log(`HSA Receipt App backend running on port ${PORT}`);
-  console.log(`Supabase: ${supabaseUrl ? 'configured' : 'NOT configured'}`);
-  console.log(`Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME ? 'configured' : 'NOT configured'}`);
 });
