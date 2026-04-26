@@ -4,11 +4,13 @@ const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
 const cloudinary = require('cloudinary').v2;
 const { v4: uuidv4 } = require('uuid');
+const CryptoJS = require('crypto-js');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const APP_PASSWORD = process.env.APP_PASSWORD || 'changeMe123';
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
 // Supabase setup
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -40,6 +42,23 @@ const verifyPassword = (req, res, next) => {
   }
 };
 
+// Encryption helpers
+const encrypt = (text) => {
+  if (!text || !ENCRYPTION_KEY) return null;
+  return CryptoJS.AES.encrypt(text, ENCRYPTION_KEY).toString();
+};
+
+const decrypt = (encryptedText) => {
+  if (!encryptedText || !ENCRYPTION_KEY) return null;
+  try {
+    const bytes = CryptoJS.AES.decrypt(encryptedText, ENCRYPTION_KEY);
+    return bytes.toString(CryptoJS.enc.Utf8);
+  } catch (err) {
+    console.error('Decrypt error:', err);
+    return null;
+  }
+};
+
 const uploadToCloudinary = (buffer, originalName) => {
   return new Promise((resolve, reject) => {
     const isPdf = originalName.match(/\.pdf$/i);
@@ -62,8 +81,7 @@ const uploadToCloudinary = (buffer, originalName) => {
   });
 };
 
-// Routes
-
+// ============ AUTH ============
 app.post('/api/login', (req, res) => {
   const { password } = req.body;
   if (!password) return res.status(400).json({ error: 'Password required' });
@@ -74,6 +92,7 @@ app.post('/api/login', (req, res) => {
   }
 });
 
+// ============ RECEIPTS ============
 app.post('/api/receipts', upload.single('file'), verifyPassword, async (req, res) => {
   try {
     const { vendor_name, amount, expense_date, category, notes, is_reimbursed } = req.body;
@@ -112,7 +131,7 @@ app.post('/api/receipts', upload.single('file'), verifyPassword, async (req, res
 
 app.get('/api/receipts', verifyPassword, async (req, res) => {
   try {
-    const { startDate, endDate, category, vendorSearch, includeReimbursed } = req.query;
+    const { startDate, endDate, category, vendorSearch } = req.query;
 
     let query = supabase
       .from('receipts')
@@ -126,14 +145,9 @@ app.get('/api/receipts', verifyPassword, async (req, res) => {
 
     const { data, error } = await query;
 
-    if (error) {
-      console.error('Supabase query error:', error);
-      return res.status(500).json({ error: 'Failed to fetch receipts' });
-    }
-
+    if (error) return res.status(500).json({ error: 'Failed to fetch receipts' });
     res.json(data || []);
   } catch (err) {
-    console.error('Fetch error:', err);
     res.status(500).json({ error: 'Failed to fetch receipts' });
   }
 });
@@ -154,7 +168,6 @@ app.get('/api/receipts/:id', verifyPassword, async (req, res) => {
   }
 });
 
-// PUT /api/receipts/:id - Update receipt (for marking reimbursed)
 app.put('/api/receipts/:id', verifyPassword, async (req, res) => {
   try {
     const { id } = req.params;
@@ -174,11 +187,7 @@ app.put('/api/receipts/:id', verifyPassword, async (req, res) => {
       .eq('id', id)
       .select();
 
-    if (error) {
-      console.error('Update error:', error);
-      return res.status(500).json({ error: 'Failed to update' });
-    }
-
+    if (error) return res.status(500).json({ error: 'Failed to update' });
     res.json(data[0]);
   } catch (err) {
     res.status(500).json({ error: 'Failed to update' });
@@ -188,20 +197,12 @@ app.put('/api/receipts/:id', verifyPassword, async (req, res) => {
 app.delete('/api/receipts/:id', verifyPassword, async (req, res) => {
   try {
     const { id } = req.params;
-    const { data: receipt, error: fetchError } = await supabase
-      .from('receipts')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (fetchError || !receipt) return res.status(404).json({ error: 'Receipt not found' });
-
-    const { error: deleteError } = await supabase
+    const { error } = await supabase
       .from('receipts')
       .delete()
       .eq('id', id);
 
-    if (deleteError) return res.status(500).json({ error: 'Failed to delete' });
+    if (error) return res.status(500).json({ error: 'Failed to delete' });
     res.json({ message: 'Receipt deleted' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete' });
@@ -213,7 +214,6 @@ app.get('/api/categories', verifyPassword, (req, res) => {
   res.json(categories);
 });
 
-// GET /api/stats - Dashboard statistics
 app.get('/api/stats', verifyPassword, async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -231,17 +231,13 @@ app.get('/api/stats', verifyPassword, async (req, res) => {
       new Date(r.expense_date).getFullYear() === currentYear
     );
 
-    // Monthly totals (current year)
     const monthlyTotals = {};
-    for (let m = 0; m < 12; m++) {
-      monthlyTotals[m] = 0;
-    }
+    for (let m = 0; m < 12; m++) monthlyTotals[m] = 0;
     thisYearReceipts.forEach(r => {
       const month = new Date(r.expense_date).getMonth();
       monthlyTotals[month] += parseFloat(r.amount);
     });
 
-    // Yearly totals
     const yearlyTotals = {};
     nonReimbursed.forEach(r => {
       const year = new Date(r.expense_date).getFullYear();
@@ -263,7 +259,6 @@ app.get('/api/stats', verifyPassword, async (req, res) => {
       current_year: currentYear,
     });
   } catch (err) {
-    console.error('Stats error:', err);
     res.status(500).json({ error: 'Failed to fetch stats' });
   }
 });
@@ -282,8 +277,137 @@ app.get('/api/export', verifyPassword, async (req, res) => {
   }
 });
 
+// ============ HSA ACCOUNTS ============
+
+// GET all HSA accounts (returns decrypted passwords)
+app.get('/api/hsa-accounts', verifyPassword, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('hsa_accounts')
+      .select('*')
+      .order('is_active', { ascending: false })
+      .order('name', { ascending: true });
+
+    if (error) return res.status(500).json({ error: 'Failed to fetch accounts' });
+
+    // Decrypt passwords
+    const accounts = (data || []).map(account => ({
+      ...account,
+      password: account.password_encrypted ? decrypt(account.password_encrypted) : '',
+      password_encrypted: undefined, // don't send encrypted version
+    }));
+
+    res.json(accounts);
+  } catch (err) {
+    console.error('Fetch accounts error:', err);
+    res.status(500).json({ error: 'Failed to fetch accounts' });
+  }
+});
+
+// GET single HSA account
+app.get('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabase
+      .from('hsa_accounts')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) return res.status(404).json({ error: 'Account not found' });
+
+    res.json({
+      ...data,
+      password: data.password_encrypted ? decrypt(data.password_encrypted) : '',
+      password_encrypted: undefined,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch account' });
+  }
+});
+
+// POST create HSA account
+app.post('/api/hsa-accounts', verifyPassword, async (req, res) => {
+  try {
+    const { name, website_url, login_username, password, account_number, notes } = req.body;
+
+    if (!name) return res.status(400).json({ error: 'Name is required' });
+
+    const insertData = {
+      name,
+      website_url: website_url || null,
+      login_username: login_username || null,
+      password_encrypted: password ? encrypt(password) : null,
+      account_number: account_number || null,
+      notes: notes || null,
+      is_active: true,
+    };
+
+    const { data, error } = await supabase
+      .from('hsa_accounts')
+      .insert([insertData])
+      .select();
+
+    if (error) {
+      console.error('Insert error:', error);
+      return res.status(500).json({ error: 'Failed to create account' });
+    }
+
+    res.json({ id: data[0].id, message: 'Account created' });
+  } catch (err) {
+    console.error('Create error:', err);
+    res.status(500).json({ error: 'Failed to create account' });
+  }
+});
+
+// PUT update HSA account
+app.put('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, website_url, login_username, password, account_number, notes, is_active } = req.body;
+
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (website_url !== undefined) updates.website_url = website_url;
+    if (login_username !== undefined) updates.login_username = login_username;
+    if (password !== undefined) updates.password_encrypted = password ? encrypt(password) : null;
+    if (account_number !== undefined) updates.account_number = account_number;
+    if (notes !== undefined) updates.notes = notes;
+    if (is_active !== undefined) updates.is_active = is_active;
+
+    const { data, error } = await supabase
+      .from('hsa_accounts')
+      .update(updates)
+      .eq('id', id)
+      .select();
+
+    if (error) return res.status(500).json({ error: 'Failed to update' });
+    res.json(data[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update' });
+  }
+});
+
+// DELETE HSA account
+app.delete('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { error } = await supabase
+      .from('hsa_accounts')
+      .delete()
+      .eq('id', id);
+
+    if (error) return res.status(500).json({ error: 'Failed to delete' });
+    res.json({ message: 'Account deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete' });
+  }
+});
+
+// ============ HEALTH ============
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 app.listen(PORT, () => {
   console.log(`HSA Receipt App backend running on port ${PORT}`);
+  console.log(`Encryption: ${ENCRYPTION_KEY ? 'configured' : 'NOT configured'}`);
 });
