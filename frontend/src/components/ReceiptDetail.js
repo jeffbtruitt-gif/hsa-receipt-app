@@ -1,18 +1,39 @@
 import React from 'react';
 
-function ReceiptDetail({ receipt, onBack }) {
+function ReceiptDetail({ receipt, onBack, onDelete, onToggleReimbursed }) {
   const isPdf = receipt.file_name && receipt.file_name.toLowerCase().endsWith('.pdf');
   const isImage = receipt.file_name && /\.(jpg|jpeg|png|gif|webp)$/i.test(receipt.file_name);
 
   return (
     <div className="receipt-detail">
-      <button onClick={onBack} className="back-btn">
-        ← Back
-      </button>
+      <div className="detail-header">
+        <button onClick={onBack} className="back-btn">← Back</button>
+        <div className="detail-actions">
+          <button 
+            onClick={() => onToggleReimbursed(receipt.id, receipt.is_reimbursed)}
+            className="toggle-btn"
+          >
+            {receipt.is_reimbursed ? 'Mark Pending' : 'Mark Reimbursed'}
+          </button>
+          <button 
+            onClick={() => onDelete(receipt.id)}
+            className="delete-btn-large"
+          >
+            Delete Receipt
+          </button>
+        </div>
+      </div>
 
       <div className="detail-content">
         <div className="detail-info">
           <h2>{receipt.vendor_name}</h2>
+          
+          {receipt.is_reimbursed && (
+            <div className="reimbursed-banner">
+              ✓ This receipt has been reimbursed
+            </div>
+          )}
+          
           <div className="info-grid">
             <div>
               <label>Date:</label>
@@ -20,11 +41,21 @@ function ReceiptDetail({ receipt, onBack }) {
             </div>
             <div>
               <label>Amount:</label>
-              <span className="amount">${receipt.amount.toFixed(2)}</span>
+              <span className="amount">${parseFloat(receipt.amount).toFixed(2)}</span>
             </div>
             <div>
               <label>Category:</label>
               <span>{receipt.category || '—'}</span>
+            </div>
+            <div>
+              <label>Status:</label>
+              <span>
+                {receipt.is_reimbursed ? (
+                  <span className="status-reimbursed">✓ Reimbursed</span>
+                ) : (
+                  <span className="status-pending">Pending</span>
+                )}
+              </span>
             </div>
             <div>
               <label>Uploaded:</label>
@@ -53,14 +84,13 @@ function ReceiptDetail({ receipt, onBack }) {
                     width="100%"
                     height="600px"
                     title="Receipt PDF"
-                    style={{ border: '1px solid #ddd', borderRadius: '4px' }}
                   />
                   <p style={{ marginTop: '10px' }}>
                     <a 
                       href={receipt.storage_path} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      style={{ color: '#5D3A3A', textDecoration: 'underline' }}
+                      className="link"
                     >
                       Open PDF in new tab
                     </a>
@@ -73,7 +103,7 @@ function ReceiptDetail({ receipt, onBack }) {
                     href={receipt.storage_path} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    style={{ color: '#5D3A3A', textDecoration: 'underline' }}
+                    className="link"
                   >
                     Download {receipt.file_name}
                   </a>
