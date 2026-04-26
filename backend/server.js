@@ -43,13 +43,14 @@ const verifyPassword = (req, res, next) => {
 };
 
 // Helper: Upload file to Cloudinary
+// PDFs are uploaded as 'image' type to allow inline preview
 const uploadToCloudinary = (buffer, originalName) => {
   return new Promise((resolve, reject) => {
-    const isImage = originalName.match(/\.(jpg|jpeg|png|gif|webp)$/i);
     const isPdf = originalName.match(/\.pdf$/i);
     
-    let resourceType = 'auto';
-    if (isPdf) resourceType = 'raw';
+    // Upload PDFs as 'image' type so they can be displayed inline
+    // This works because Cloudinary treats PDFs specially when uploaded as image
+    const resourceType = 'image';
     
     const uploadStream = cloudinary.uploader.upload_stream(
       {
@@ -57,6 +58,8 @@ const uploadToCloudinary = (buffer, originalName) => {
         folder: 'hsa-receipts',
         public_id: `${Date.now()}-${uuidv4()}`,
         use_filename: false,
+        // For PDFs, set format to ensure proper handling
+        ...(isPdf && { format: 'pdf' }),
       },
       (error, result) => {
         if (error) reject(error);
@@ -175,7 +178,6 @@ app.delete('/api/receipts/:id', verifyPassword, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get receipt first to get the file URL
     const { data: receipt, error: fetchError } = await supabase
       .from('receipts')
       .select('*')
@@ -186,7 +188,6 @@ app.delete('/api/receipts/:id', verifyPassword, async (req, res) => {
       return res.status(404).json({ error: 'Receipt not found' });
     }
 
-    // Delete from Supabase
     const { error: deleteError } = await supabase
       .from('receipts')
       .delete()
@@ -196,9 +197,6 @@ app.delete('/api/receipts/:id', verifyPassword, async (req, res) => {
       console.error('Delete error:', deleteError);
       return res.status(500).json({ error: 'Failed to delete' });
     }
-
-    // Note: Cloudinary file remains - manual cleanup or scheduled job needed
-    // (For production, you'd want to delete from Cloudinary too using public_id)
 
     res.json({ message: 'Receipt deleted' });
   } catch (err) {
