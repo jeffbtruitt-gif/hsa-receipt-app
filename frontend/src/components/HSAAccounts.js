@@ -14,10 +14,12 @@ function HSAAccounts({ password }) {
   const fetchAccounts = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${apiUrl}/api/hsa-accounts?password=${password}`);
+      const response = await fetch(`${apiUrl}/api/hsa-accounts?password=${encodeURIComponent(password)}`);
       if (response.ok) {
         const data = await response.json();
         setAccounts(data);
+      } else {
+        console.error('Fetch failed:', response.status);
       }
     } catch (err) {
       console.error('Failed to fetch accounts:', err);
@@ -43,8 +45,8 @@ function HSAAccounts({ password }) {
   const handleSave = async (formData) => {
     try {
       const url = editingAccount 
-        ? `${apiUrl}/api/hsa-accounts/${editingAccount.id}`
-        : `${apiUrl}/api/hsa-accounts`;
+        ? `${apiUrl}/api/hsa-accounts/${editingAccount.id}?password=${encodeURIComponent(password)}`
+        : `${apiUrl}/api/hsa-accounts?password=${encodeURIComponent(password)}`;
       
       const response = await fetch(url, {
         method: editingAccount ? 'PUT' : 'POST',
@@ -57,7 +59,9 @@ function HSAAccounts({ password }) {
         setEditingAccount(null);
         fetchAccounts();
       } else {
-        alert('Failed to save account');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Save failed:', response.status, errorData);
+        alert(`Failed to save account: ${errorData.error || response.status}`);
       }
     } catch (err) {
       console.error('Save error:', err);
@@ -67,7 +71,7 @@ function HSAAccounts({ password }) {
 
   const handleToggleActive = async (account) => {
     try {
-      const response = await fetch(`${apiUrl}/api/hsa-accounts/${account.id}`, {
+      const response = await fetch(`${apiUrl}/api/hsa-accounts/${account.id}?password=${encodeURIComponent(password)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password, is_active: !account.is_active }),
@@ -81,7 +85,7 @@ function HSAAccounts({ password }) {
   const handleDelete = async (id) => {
     if (!window.confirm('Permanently delete this account? This cannot be undone.')) return;
     try {
-      const response = await fetch(`${apiUrl}/api/hsa-accounts/${id}`, {
+      const response = await fetch(`${apiUrl}/api/hsa-accounts/${id}?password=${encodeURIComponent(password)}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
@@ -98,7 +102,6 @@ function HSAAccounts({ password }) {
 
   const copyToClipboard = (text, label) => {
     navigator.clipboard.writeText(text);
-    // Could add a toast notification here
   };
 
   const activeAccounts = accounts.filter(a => a.is_active);
@@ -134,7 +137,6 @@ function HSAAccounts({ password }) {
         </div>
       ) : (
         <>
-          {/* Active Accounts */}
           <div className="accounts-section">
             <h2 className="section-title">Active Accounts ({activeAccounts.length})</h2>
             {activeAccounts.length === 0 ? (
@@ -157,7 +159,6 @@ function HSAAccounts({ password }) {
             )}
           </div>
 
-          {/* Inactive Accounts */}
           {inactiveAccounts.length > 0 && (
             <div className="accounts-section inactive-section">
               <button 
