@@ -30,7 +30,6 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// Verify password from body OR query params
 const verifyPassword = (req, res, next) => {
   const password = req.body?.password || req.query?.password;
   if (password === APP_PASSWORD) {
@@ -325,7 +324,8 @@ app.get('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
 
 app.post('/api/hsa-accounts', verifyPassword, async (req, res) => {
   try {
-    const { name, website_url, login_username, password, account_number, notes } = req.body;
+    // password_value is the HSA account password (NOT the app login password)
+    const { name, website_url, login_username, password_value, account_number, notes } = req.body;
 
     if (!name) return res.status(400).json({ error: 'Name is required' });
 
@@ -333,7 +333,7 @@ app.post('/api/hsa-accounts', verifyPassword, async (req, res) => {
       name,
       website_url: website_url || null,
       login_username: login_username || null,
-      password_encrypted: password ? encrypt(password) : null,
+      password_encrypted: password_value ? encrypt(password_value) : null,
       account_number: account_number || null,
       notes: notes || null,
       is_active: true,
@@ -359,13 +359,13 @@ app.post('/api/hsa-accounts', verifyPassword, async (req, res) => {
 app.put('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, website_url, login_username, password, account_number, notes, is_active } = req.body;
+    const { name, website_url, login_username, password_value, account_number, notes, is_active } = req.body;
 
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (website_url !== undefined) updates.website_url = website_url;
     if (login_username !== undefined) updates.login_username = login_username;
-    if (password !== undefined) updates.password_encrypted = password ? encrypt(password) : null;
+    if (password_value !== undefined) updates.password_encrypted = password_value ? encrypt(password_value) : null;
     if (account_number !== undefined) updates.account_number = account_number;
     if (notes !== undefined) updates.notes = notes;
     if (is_active !== undefined) updates.is_active = is_active;
