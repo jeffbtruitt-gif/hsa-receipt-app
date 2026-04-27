@@ -12,19 +12,16 @@ const PORT = process.env.PORT || 5000;
 const APP_PASSWORD = process.env.APP_PASSWORD || 'changeMe123';
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
-// Supabase setup
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Cloudinary setup
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
@@ -33,16 +30,17 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
+// Verify password from body OR query params
 const verifyPassword = (req, res, next) => {
   const password = req.body?.password || req.query?.password;
   if (password === APP_PASSWORD) {
     next();
   } else {
+    console.log('Auth failed. Got password:', password ? 'present' : 'missing');
     res.status(401).json({ error: 'Unauthorized' });
   }
 };
 
-// Encryption helpers
 const encrypt = (text) => {
   if (!text || !ENCRYPTION_KEY) return null;
   return CryptoJS.AES.encrypt(text, ENCRYPTION_KEY).toString();
@@ -81,7 +79,7 @@ const uploadToCloudinary = (buffer, originalName) => {
   });
 };
 
-// ============ AUTH ============
+// AUTH
 app.post('/api/login', (req, res) => {
   const { password } = req.body;
   if (!password) return res.status(400).json({ error: 'Password required' });
@@ -92,7 +90,7 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-// ============ RECEIPTS ============
+// RECEIPTS
 app.post('/api/receipts', upload.single('file'), verifyPassword, async (req, res) => {
   try {
     const { vendor_name, amount, expense_date, category, notes, is_reimbursed } = req.body;
@@ -277,9 +275,7 @@ app.get('/api/export', verifyPassword, async (req, res) => {
   }
 });
 
-// ============ HSA ACCOUNTS ============
-
-// GET all HSA accounts (returns decrypted passwords)
+// HSA ACCOUNTS
 app.get('/api/hsa-accounts', verifyPassword, async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -288,13 +284,15 @@ app.get('/api/hsa-accounts', verifyPassword, async (req, res) => {
       .order('is_active', { ascending: false })
       .order('name', { ascending: true });
 
-    if (error) return res.status(500).json({ error: 'Failed to fetch accounts' });
+    if (error) {
+      console.error('HSA accounts fetch error:', error);
+      return res.status(500).json({ error: 'Failed to fetch accounts' });
+    }
 
-    // Decrypt passwords
     const accounts = (data || []).map(account => ({
       ...account,
       password: account.password_encrypted ? decrypt(account.password_encrypted) : '',
-      password_encrypted: undefined, // don't send encrypted version
+      password_encrypted: undefined,
     }));
 
     res.json(accounts);
@@ -304,7 +302,6 @@ app.get('/api/hsa-accounts', verifyPassword, async (req, res) => {
   }
 });
 
-// GET single HSA account
 app.get('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
   try {
     const { id } = req.params;
@@ -326,7 +323,6 @@ app.get('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
   }
 });
 
-// POST create HSA account
 app.post('/api/hsa-accounts', verifyPassword, async (req, res) => {
   try {
     const { name, website_url, login_username, password, account_number, notes } = req.body;
@@ -349,18 +345,17 @@ app.post('/api/hsa-accounts', verifyPassword, async (req, res) => {
       .select();
 
     if (error) {
-      console.error('Insert error:', error);
-      return res.status(500).json({ error: 'Failed to create account' });
+      console.error('HSA account insert error:', error);
+      return res.status(500).json({ error: 'Failed to create account', details: error.message });
     }
 
     res.json({ id: data[0].id, message: 'Account created' });
   } catch (err) {
     console.error('Create error:', err);
-    res.status(500).json({ error: 'Failed to create account' });
+    res.status(500).json({ error: 'Failed to create account', details: err.message });
   }
 });
 
-// PUT update HSA account
 app.put('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
   try {
     const { id } = req.params;
@@ -381,14 +376,16 @@ app.put('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
       .eq('id', id)
       .select();
 
-    if (error) return res.status(500).json({ error: 'Failed to update' });
+    if (error) {
+      console.error('HSA update error:', error);
+      return res.status(500).json({ error: 'Failed to update' });
+    }
     res.json(data[0]);
   } catch (err) {
     res.status(500).json({ error: 'Failed to update' });
   }
 });
 
-// DELETE HSA account
 app.delete('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
   try {
     const { id } = req.params;
@@ -404,7 +401,6 @@ app.delete('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
   }
 });
 
-// ============ HEALTH ============
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 app.listen(PORT, () => {
