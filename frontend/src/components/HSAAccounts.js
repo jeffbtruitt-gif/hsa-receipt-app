@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import HSAAccountForm from './HSAAccountForm';
 
 function HSAAccounts({ password }) {
+  // Note: 'password' is the APP LOGIN password (used to authenticate with backend)
+  // It's separate from the HSA account passwords being saved
+  
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -42,16 +45,29 @@ function HSAAccounts({ password }) {
     setShowForm(true);
   };
 
+  // formData contains the HSA ACCOUNT details (including its own password)
+  // We need to send the APP LOGIN password separately for authentication
   const handleSave = async (formData) => {
     try {
       const url = editingAccount 
         ? `${apiUrl}/api/hsa-accounts/${editingAccount.id}?password=${encodeURIComponent(password)}`
         : `${apiUrl}/api/hsa-accounts?password=${encodeURIComponent(password)}`;
       
+      // Build request body with HSA account data + login password for auth
+      const requestBody = {
+        password: password, // APP LOGIN password (for authentication)
+        name: formData.name,
+        website_url: formData.website_url,
+        login_username: formData.login_username,
+        password_value: formData.password, // HSA ACCOUNT password (renamed to avoid conflict)
+        account_number: formData.account_number,
+        notes: formData.notes,
+      };
+      
       const response = await fetch(url, {
         method: editingAccount ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, ...formData }),
+        body: JSON.stringify(requestBody),
       });
 
       if (response.ok) {
