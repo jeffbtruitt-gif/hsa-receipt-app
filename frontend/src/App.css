@@ -990,8 +990,8 @@ body {
   }
 }
 
-/* ===== HSA ACCOUNTS PAGE (UPDATED - Full Width Rows) ===== */
-/* REPLACE the existing HSA accounts styles in App.css with these */
+/* ===== HSA ACCOUNTS PAGE (UPDATED v3) ===== */
+/* Replace the existing HSA accounts styles in App.css with these */
 
 .hsa-accounts-page {
   width: 100%;
@@ -1128,6 +1128,7 @@ body {
   font-weight: 600;
 }
 
+/* Field layout - Username and Key on same row */
 .account-row-fields {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1211,6 +1212,7 @@ body {
   min-width: 140px;
 }
 
+/* All action buttons same style as Visit Site (navy with gold) */
 .action-btn {
   padding: 8px 14px;
   border-radius: 4px;
@@ -1222,50 +1224,27 @@ body {
   text-decoration: none;
   display: block;
   transition: all 0.2s;
-  border: 1px solid transparent;
-}
-
-.action-btn.primary {
   background: var(--hsa-navy);
   color: var(--hsa-gold);
-  border-color: var(--hsa-gold);
+  border: 1px solid var(--hsa-gold);
 }
 
-.action-btn.primary:hover {
+.action-btn:hover {
   background: var(--hsa-gold);
   color: var(--hsa-navy);
 }
 
-.action-btn.secondary {
-  background: var(--hsa-white);
-  color: var(--hsa-navy);
-  border-color: var(--hsa-navy);
-}
-
-.action-btn.secondary:hover {
-  background: var(--hsa-navy);
-  color: var(--hsa-white);
-}
-
-.action-btn.toggle {
-  background: var(--hsa-gold);
-  color: var(--hsa-navy);
-  border-color: var(--hsa-gold-deep);
-}
-
-.action-btn.toggle:hover {
-  background: var(--hsa-gold-soft);
-}
-
+/* Delete button - red filled with white text */
 .action-btn.delete {
-  background: transparent;
-  color: var(--hsa-danger);
-  border-color: var(--hsa-danger);
+  background: var(--hsa-danger);
+  color: white;
+  border: 1px solid var(--hsa-danger);
 }
 
 .action-btn.delete:hover {
-  background: var(--hsa-danger);
+  background: #9c3434;
   color: white;
+  border-color: #9c3434;
 }
 
 /* Image upload area */
@@ -1346,6 +1325,22 @@ body {
   .account-row {
     grid-template-columns: 100px 1fr;
   }
+  
+  .account-row-actions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  
+  .account-image {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .account-row-fields {
+    grid-template-columns: 1fr;
+  }
+}
   
   .account-row-actions {
     grid-column: 1 / -1;
