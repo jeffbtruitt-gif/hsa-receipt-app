@@ -8,8 +8,10 @@ function HSAAccountForm({ account, onSave, onCancel }) {
     password: '',
     account_number: '',
     notes: '',
+    image: null,
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [imagePreview, setImagePreview] = useState('');
 
   useEffect(() => {
     if (account) {
@@ -20,13 +22,27 @@ function HSAAccountForm({ account, onSave, onCancel }) {
         password: account.password || '',
         account_number: account.account_number || '',
         notes: account.notes || '',
+        image: null,
       });
+      if (account.image_url) {
+        setImagePreview(account.image_url);
+      }
     }
   }, [account]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFormData({ ...formData, image: file });
+      const reader = new FileReader();
+      reader.onload = (e) => setImagePreview(e.target.result);
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = (e) => {
@@ -60,6 +76,24 @@ function HSAAccountForm({ account, onSave, onCancel }) {
         </div>
 
         <div className="form-group">
+          <label>Account Image / Logo</label>
+          <div className="image-upload-area">
+            {imagePreview && (
+              <div className="image-preview">
+                <img src={imagePreview} alt="Account preview" />
+              </div>
+            )}
+            <input 
+              type="file" 
+              id="image" 
+              onChange={handleImageChange} 
+              accept="image/*"
+            />
+            <p className="form-help">Upload an image to help identify this account (optional)</p>
+          </div>
+        </div>
+
+        <div className="form-group">
           <label htmlFor="website_url">Website URL</label>
           <input
             type="url"
@@ -86,7 +120,7 @@ function HSAAccountForm({ account, onSave, onCancel }) {
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password">Key</label>
             <div className="password-field">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -94,7 +128,7 @@ function HSAAccountForm({ account, onSave, onCancel }) {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="Password"
+                placeholder="Account key"
                 autoComplete="new-password"
               />
               <button
@@ -133,8 +167,7 @@ function HSAAccountForm({ account, onSave, onCancel }) {
         </div>
 
         <div className="encryption-note">
-          🔐 <strong>Security:</strong> Passwords are encrypted before being stored. 
-          Only you can decrypt them with your encryption key.
+          🔐 <strong>Security:</strong> Account keys are encrypted before being stored.
         </div>
 
         <button type="submit" className="submit-btn">
