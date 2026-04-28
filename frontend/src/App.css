@@ -1075,7 +1075,6 @@ body {
   border-radius: 6px;
   overflow: hidden;
   background: var(--hsa-cream);
-  border: 1px solid var(--hsa-gray-light);
   display: flex;
   align-items: center;
   justify-content: center;
