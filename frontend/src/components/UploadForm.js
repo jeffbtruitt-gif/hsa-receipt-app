@@ -201,7 +201,7 @@ function UploadForm({ password, categories, onUploadSuccess }) {
           />
         </div>
 
-        <div className="form-group checkbox-group">
+        <div className="form-group">
           <label className="checkbox-label">
             <input
               type="checkbox"
@@ -209,9 +209,8 @@ function UploadForm({ password, categories, onUploadSuccess }) {
               checked={formData.is_reimbursed}
               onChange={handleInputChange}
             />
-            <span>Already Reimbursed</span>
+            <span>Reimbursed</span>
           </label>
-          <p className="checkbox-help">Check if this expense has already been reimbursed (excluded from totals)</p>
         </div>
 
         <div className="form-group">
