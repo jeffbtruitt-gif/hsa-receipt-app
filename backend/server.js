@@ -35,7 +35,6 @@ const verifyPassword = (req, res, next) => {
   if (password === APP_PASSWORD) {
     next();
   } else {
-    console.log('Auth failed. Got password:', password ? 'present' : 'missing');
     res.status(401).json({ error: 'Unauthorized' });
   }
 };
@@ -51,20 +50,19 @@ const decrypt = (encryptedText) => {
     const bytes = CryptoJS.AES.decrypt(encryptedText, ENCRYPTION_KEY);
     return bytes.toString(CryptoJS.enc.Utf8);
   } catch (err) {
-    console.error('Decrypt error:', err);
     return null;
   }
 };
 
-const uploadToCloudinary = (buffer, originalName) => {
+const uploadToCloudinary = (buffer, originalName, folder = 'hsa-receipts') => {
   return new Promise((resolve, reject) => {
-    const isPdf = originalName.match(/\.pdf$/i);
+    const isPdf = originalName && originalName.match(/\.pdf$/i);
     const resourceType = 'image';
     
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         resource_type: resourceType,
-        folder: 'hsa-receipts',
+        folder: folder,
         public_id: `${Date.now()}-${uuidv4()}`,
         use_filename: false,
         ...(isPdf && { format: 'pdf' }),
@@ -98,7 +96,7 @@ app.post('/api/receipts', upload.single('file'), verifyPassword, async (req, res
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const cloudinaryResult = await uploadToCloudinary(req.file.buffer, req.file.originalname);
+    const cloudinaryResult = await uploadToCloudinary(req.file.buffer, req.file.originalname, 'hsa-receipts');
 
     const { data, error } = await supabase
       .from('receipts')
@@ -114,14 +112,9 @@ app.post('/api/receipts', upload.single('file'), verifyPassword, async (req, res
       }])
       .select();
 
-    if (error) {
-      console.error('Supabase insert error:', error);
-      return res.status(500).json({ error: 'Failed to save receipt' });
-    }
-
+    if (error) return res.status(500).json({ error: 'Failed to save receipt' });
     res.json({ id: data[0].id, message: 'Receipt uploaded successfully' });
   } catch (err) {
-    console.error('Upload error:', err);
     res.status(500).json({ error: 'Upload failed', details: err.message });
   }
 });
@@ -129,7 +122,6 @@ app.post('/api/receipts', upload.single('file'), verifyPassword, async (req, res
 app.get('/api/receipts', verifyPassword, async (req, res) => {
   try {
     const { startDate, endDate, category, vendorSearch } = req.query;
-
     let query = supabase
       .from('receipts')
       .select('*')
@@ -141,7 +133,6 @@ app.get('/api/receipts', verifyPassword, async (req, res) => {
     if (vendorSearch) query = query.ilike('vendor_name', `%${vendorSearch}%`);
 
     const { data, error } = await query;
-
     if (error) return res.status(500).json({ error: 'Failed to fetch receipts' });
     res.json(data || []);
   } catch (err) {
@@ -152,12 +143,7 @@ app.get('/api/receipts', verifyPassword, async (req, res) => {
 app.get('/api/receipts/:id', verifyPassword, async (req, res) => {
   try {
     const { id } = req.params;
-    const { data, error } = await supabase
-      .from('receipts')
-      .select('*')
-      .eq('id', id)
-      .single();
-
+    const { data, error } = await supabase.from('receipts').select('*').eq('id', id).single();
     if (error || !data) return res.status(404).json({ error: 'Receipt not found' });
     res.json(data);
   } catch (err) {
@@ -169,7 +155,6 @@ app.put('/api/receipts/:id', verifyPassword, async (req, res) => {
   try {
     const { id } = req.params;
     const { is_reimbursed, vendor_name, amount, expense_date, category, notes } = req.body;
-    
     const updates = {};
     if (is_reimbursed !== undefined) updates.is_reimbursed = is_reimbursed;
     if (vendor_name !== undefined) updates.vendor_name = vendor_name;
@@ -178,12 +163,7 @@ app.put('/api/receipts/:id', verifyPassword, async (req, res) => {
     if (category !== undefined) updates.category = category;
     if (notes !== undefined) updates.notes = notes;
 
-    const { data, error } = await supabase
-      .from('receipts')
-      .update(updates)
-      .eq('id', id)
-      .select();
-
+    const { data, error } = await supabase.from('receipts').update(updates).eq('id', id).select();
     if (error) return res.status(500).json({ error: 'Failed to update' });
     res.json(data[0]);
   } catch (err) {
@@ -194,11 +174,7 @@ app.put('/api/receipts/:id', verifyPassword, async (req, res) => {
 app.delete('/api/receipts/:id', verifyPassword, async (req, res) => {
   try {
     const { id } = req.params;
-    const { error } = await supabase
-      .from('receipts')
-      .delete()
-      .eq('id', id);
-
+    const { error } = await supabase.from('receipts').delete().eq('id', id);
     if (error) return res.status(500).json({ error: 'Failed to delete' });
     res.json({ message: 'Receipt deleted' });
   } catch (err) {
@@ -207,26 +183,18 @@ app.delete('/api/receipts/:id', verifyPassword, async (req, res) => {
 });
 
 app.get('/api/categories', verifyPassword, (req, res) => {
-  const categories = ['Medical', 'Dental', 'Pharmacy', 'Vision', 'Mental Health', 'Physical Therapy', 'Chiropractic', 'Other'];
-  res.json(categories);
+  res.json(['Medical', 'Dental', 'Pharmacy', 'Vision', 'Mental Health', 'Physical Therapy', 'Chiropractic', 'Other']);
 });
 
 app.get('/api/stats', verifyPassword, async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('receipts')
-      .select('*')
-      .order('expense_date', { ascending: false });
-
+    const { data, error } = await supabase.from('receipts').select('*').order('expense_date', { ascending: false });
     if (error) return res.status(500).json({ error: 'Failed to fetch stats' });
 
     const receipts = data || [];
     const nonReimbursed = receipts.filter(r => !r.is_reimbursed);
-    
     const currentYear = new Date().getFullYear();
-    const thisYearReceipts = nonReimbursed.filter(r => 
-      new Date(r.expense_date).getFullYear() === currentYear
-    );
+    const thisYearReceipts = nonReimbursed.filter(r => new Date(r.expense_date).getFullYear() === currentYear);
 
     const monthlyTotals = {};
     for (let m = 0; m < 12; m++) monthlyTotals[m] = 0;
@@ -241,15 +209,12 @@ app.get('/api/stats', verifyPassword, async (req, res) => {
       yearlyTotals[year] = (yearlyTotals[year] || 0) + parseFloat(r.amount);
     });
 
-    const totalAllTime = nonReimbursed.reduce((sum, r) => sum + parseFloat(r.amount), 0);
-    const totalThisYear = thisYearReceipts.reduce((sum, r) => sum + parseFloat(r.amount), 0);
-
     res.json({
       total_count: receipts.length,
       non_reimbursed_count: nonReimbursed.length,
       reimbursed_count: receipts.length - nonReimbursed.length,
-      total_all_time: totalAllTime,
-      total_this_year: totalThisYear,
+      total_all_time: nonReimbursed.reduce((sum, r) => sum + parseFloat(r.amount), 0),
+      total_this_year: thisYearReceipts.reduce((sum, r) => sum + parseFloat(r.amount), 0),
       monthly_totals: monthlyTotals,
       yearly_totals: yearlyTotals,
       recent_receipts: receipts.slice(0, 5),
@@ -262,11 +227,7 @@ app.get('/api/stats', verifyPassword, async (req, res) => {
 
 app.get('/api/export', verifyPassword, async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('receipts')
-      .select('*')
-      .order('expense_date', { ascending: false });
-
+    const { data, error } = await supabase.from('receipts').select('*').order('expense_date', { ascending: false });
     if (error) return res.status(500).json({ error: 'Failed to export' });
     res.json({ exported_at: new Date().toISOString(), receipts: data || [] });
   } catch (err) {
@@ -283,10 +244,7 @@ app.get('/api/hsa-accounts', verifyPassword, async (req, res) => {
       .order('is_active', { ascending: false })
       .order('name', { ascending: true });
 
-    if (error) {
-      console.error('HSA accounts fetch error:', error);
-      return res.status(500).json({ error: 'Failed to fetch accounts' });
-    }
+    if (error) return res.status(500).json({ error: 'Failed to fetch accounts' });
 
     const accounts = (data || []).map(account => ({
       ...account,
@@ -296,38 +254,21 @@ app.get('/api/hsa-accounts', verifyPassword, async (req, res) => {
 
     res.json(accounts);
   } catch (err) {
-    console.error('Fetch accounts error:', err);
     res.status(500).json({ error: 'Failed to fetch accounts' });
   }
 });
 
-app.get('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
+app.post('/api/hsa-accounts', upload.single('image'), verifyPassword, async (req, res) => {
   try {
-    const { id } = req.params;
-    const { data, error } = await supabase
-      .from('hsa_accounts')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error || !data) return res.status(404).json({ error: 'Account not found' });
-
-    res.json({
-      ...data,
-      password: data.password_encrypted ? decrypt(data.password_encrypted) : '',
-      password_encrypted: undefined,
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch account' });
-  }
-});
-
-app.post('/api/hsa-accounts', verifyPassword, async (req, res) => {
-  try {
-    // password_value is the HSA account password (NOT the app login password)
     const { name, website_url, login_username, password_value, account_number, notes } = req.body;
 
     if (!name) return res.status(400).json({ error: 'Name is required' });
+
+    let imageUrl = null;
+    if (req.file) {
+      const cloudinaryResult = await uploadToCloudinary(req.file.buffer, req.file.originalname, 'hsa-account-images');
+      imageUrl = cloudinaryResult.secure_url;
+    }
 
     const insertData = {
       name,
@@ -336,16 +277,13 @@ app.post('/api/hsa-accounts', verifyPassword, async (req, res) => {
       password_encrypted: password_value ? encrypt(password_value) : null,
       account_number: account_number || null,
       notes: notes || null,
+      image_url: imageUrl,
       is_active: true,
     };
 
-    const { data, error } = await supabase
-      .from('hsa_accounts')
-      .insert([insertData])
-      .select();
-
+    const { data, error } = await supabase.from('hsa_accounts').insert([insertData]).select();
     if (error) {
-      console.error('HSA account insert error:', error);
+      console.error('HSA insert error:', error);
       return res.status(500).json({ error: 'Failed to create account', details: error.message });
     }
 
@@ -356,7 +294,7 @@ app.post('/api/hsa-accounts', verifyPassword, async (req, res) => {
   }
 });
 
-app.put('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
+app.put('/api/hsa-accounts/:id', upload.single('image'), verifyPassword, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, website_url, login_username, password_value, account_number, notes, is_active } = req.body;
@@ -368,20 +306,18 @@ app.put('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
     if (password_value !== undefined) updates.password_encrypted = password_value ? encrypt(password_value) : null;
     if (account_number !== undefined) updates.account_number = account_number;
     if (notes !== undefined) updates.notes = notes;
-    if (is_active !== undefined) updates.is_active = is_active;
+    if (is_active !== undefined) updates.is_active = is_active === 'true' || is_active === true;
 
-    const { data, error } = await supabase
-      .from('hsa_accounts')
-      .update(updates)
-      .eq('id', id)
-      .select();
-
-    if (error) {
-      console.error('HSA update error:', error);
-      return res.status(500).json({ error: 'Failed to update' });
+    if (req.file) {
+      const cloudinaryResult = await uploadToCloudinary(req.file.buffer, req.file.originalname, 'hsa-account-images');
+      updates.image_url = cloudinaryResult.secure_url;
     }
+
+    const { data, error } = await supabase.from('hsa_accounts').update(updates).eq('id', id).select();
+    if (error) return res.status(500).json({ error: 'Failed to update' });
     res.json(data[0]);
   } catch (err) {
+    console.error('Update error:', err);
     res.status(500).json({ error: 'Failed to update' });
   }
 });
@@ -389,11 +325,7 @@ app.put('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
 app.delete('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
   try {
     const { id } = req.params;
-    const { error } = await supabase
-      .from('hsa_accounts')
-      .delete()
-      .eq('id', id);
-
+    const { error } = await supabase.from('hsa_accounts').delete().eq('id', id);
     if (error) return res.status(500).json({ error: 'Failed to delete' });
     res.json({ message: 'Account deleted' });
   } catch (err) {
@@ -405,5 +337,4 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 app.listen(PORT, () => {
   console.log(`HSA Receipt App backend running on port ${PORT}`);
-  console.log(`Encryption: ${ENCRYPTION_KEY ? 'configured' : 'NOT configured'}`);
 });
