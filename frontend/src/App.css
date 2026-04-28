@@ -1132,6 +1132,7 @@ body {
   font-size: 14px;
   color: var(--hsa-navy);
   word-break: break-all;
+  justify-content: flex-start;
 }
 
 .account-row-field .link {
@@ -1147,7 +1148,6 @@ body {
 .password-display {
   font-family: monospace;
   letter-spacing: 1px;
-  flex: 1;
 }
 
 .account-notes {
