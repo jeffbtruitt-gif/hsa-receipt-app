@@ -990,11 +990,11 @@ body {
   }
 }
 
-/* ===== HSA ACCOUNTS PAGE ===== */
-/* Add these styles to your existing App.css */
+/* ===== HSA ACCOUNTS PAGE (UPDATED - Full Width Rows) ===== */
+/* REPLACE the existing HSA accounts styles in App.css with these */
 
 .hsa-accounts-page {
-  max-width: 1200px;
+  width: 100%;
 }
 
 .empty-state {
@@ -1044,39 +1044,77 @@ body {
   border-radius: 4px;
 }
 
-/* Account Cards */
-.accounts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: 20px;
+/* Full-width account list */
+.accounts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.account-card {
+.account-row {
   background: var(--hsa-white);
   border-radius: 6px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  border-top: 4px solid var(--hsa-gold);
-  overflow: hidden;
+  border-left: 4px solid var(--hsa-gold);
+  display: grid;
+  grid-template-columns: 140px 1fr auto;
+  gap: 24px;
+  padding: 20px;
+  align-items: start;
 }
 
-.account-card.inactive {
+.account-row.inactive {
   opacity: 0.7;
-  border-top-color: var(--hsa-gray-medium);
+  border-left-color: var(--hsa-gray-medium);
 }
 
-.account-card-header {
-  padding: 16px 20px;
-  background: var(--hsa-navy);
-  color: var(--hsa-white);
+/* Image section */
+.account-image {
+  width: 140px;
+  height: 140px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--hsa-cream);
+  border: 1px solid var(--hsa-gray-light);
+}
+
+.account-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.account-image-placeholder {
+  width: 100%;
+  height: 100%;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: center;
+  background: var(--hsa-navy);
+  color: var(--hsa-gold);
+  font-size: 56px;
+  font-weight: 700;
 }
 
-.account-card-header h3 {
-  font-size: 16px;
+/* Info section */
+.account-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-row-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--hsa-gray-light);
+}
+
+.account-row-header h3 {
+  color: var(--hsa-navy);
+  font-size: 20px;
   font-weight: 600;
-  color: var(--hsa-gold);
 }
 
 .inactive-badge {
@@ -1090,29 +1128,31 @@ body {
   font-weight: 600;
 }
 
-.account-fields {
-  padding: 16px 20px;
+.account-row-fields {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px 24px;
 }
 
-.account-field {
-  margin-bottom: 12px;
+.account-row-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.account-field:last-child {
-  margin-bottom: 0;
+.account-row-field.full-width {
+  grid-column: 1 / -1;
 }
 
-.account-field label {
-  display: block;
+.account-row-field label {
   font-size: 10px;
   color: var(--hsa-gray-medium);
   text-transform: uppercase;
   letter-spacing: 1px;
   font-weight: 600;
-  margin-bottom: 4px;
 }
 
-.field-value {
+.account-row-field .field-value {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1121,128 +1161,150 @@ body {
   word-break: break-all;
 }
 
-.field-value .link {
-  flex: 1;
+.account-row-field .link {
   font-size: 13px;
+  color: var(--hsa-burgundy);
+  text-decoration: none;
+}
+
+.account-row-field .link:hover {
+  text-decoration: underline;
 }
 
 .password-display {
-  flex: 1;
   font-family: monospace;
   letter-spacing: 1px;
-}
-
-.copy-btn {
-  background: transparent;
-  border: 1px solid var(--hsa-gray-light);
-  border-radius: 3px;
-  padding: 4px 8px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: all 0.15s;
-}
-
-.copy-btn:hover {
-  background: var(--hsa-gray-light);
+  flex: 1;
 }
 
 .account-notes {
   font-size: 13px;
   color: var(--hsa-gray-dark);
   white-space: pre-wrap;
+  margin-top: 4px;
 }
 
-.account-actions {
-  padding: 12px 20px;
-  background: var(--hsa-cream);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  border-top: 1px solid var(--hsa-gray-light);
-}
-
-.primary-btn-small {
+/* Icon buttons */
+.icon-btn {
   background: var(--hsa-navy);
-  color: var(--hsa-gold);
-  border: 1px solid var(--hsa-gold);
-  padding: 6px 12px;
+  color: var(--hsa-white);
+  border: 1px solid var(--hsa-navy);
+  border-radius: 3px;
+  padding: 4px 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.icon-btn:hover {
+  background: var(--hsa-burgundy);
+  border-color: var(--hsa-burgundy);
+}
+
+/* Action buttons - vertical column */
+.account-row-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 140px;
+}
+
+.action-btn {
+  padding: 8px 14px;
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
+  letter-spacing: 0.5px;
   cursor: pointer;
+  text-align: center;
   text-decoration: none;
-  display: inline-block;
+  display: block;
   transition: all 0.2s;
+  border: 1px solid transparent;
 }
 
-.primary-btn-small:hover {
+.action-btn.primary {
+  background: var(--hsa-navy);
+  color: var(--hsa-gold);
+  border-color: var(--hsa-gold);
+}
+
+.action-btn.primary:hover {
   background: var(--hsa-gold);
   color: var(--hsa-navy);
 }
 
-.secondary-btn-small {
+.action-btn.secondary {
   background: var(--hsa-white);
   color: var(--hsa-navy);
-  border: 1px solid var(--hsa-navy);
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
+  border-color: var(--hsa-navy);
 }
 
-.secondary-btn-small:hover {
+.action-btn.secondary:hover {
   background: var(--hsa-navy);
   color: var(--hsa-white);
 }
 
-.toggle-btn-small {
+.action-btn.toggle {
   background: var(--hsa-gold);
   color: var(--hsa-navy);
-  border: 1px solid var(--hsa-gold-deep);
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
+  border-color: var(--hsa-gold-deep);
 }
 
-.toggle-btn-small:hover {
+.action-btn.toggle:hover {
   background: var(--hsa-gold-soft);
 }
 
-.delete-btn-small {
+.action-btn.delete {
   background: transparent;
   color: var(--hsa-danger);
-  border: 1px solid var(--hsa-danger);
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
+  border-color: var(--hsa-danger);
 }
 
-.delete-btn-small:hover {
+.action-btn.delete:hover {
   background: var(--hsa-danger);
   color: white;
 }
 
-.secondary-btn {
-  background: var(--hsa-white);
-  color: var(--hsa-navy);
-  border: 2px solid var(--hsa-navy);
-  padding: 10px 20px;
+/* Image upload area */
+.image-upload-area {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.image-preview {
+  width: 200px;
+  height: 200px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--hsa-gray-light);
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.form-help {
+  font-size: 12px;
+  color: var(--hsa-gray-medium);
+  font-style: italic;
+}
+
+.encryption-note {
+  background: #f0f7ff;
+  border: 1px solid #cde0f4;
+  color: #1a4480;
+  padding: 12px 16px;
   border-radius: 4px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
+  font-size: 13px;
+  margin-bottom: 16px;
 }
 
-.secondary-btn:hover {
-  background: var(--hsa-navy);
-  color: var(--hsa-white);
-}
-
-/* Password field with toggle */
 .password-field {
   position: relative;
   display: flex;
@@ -1263,12 +1325,40 @@ body {
   padding: 4px;
 }
 
-.encryption-note {
-  background: #f0f7ff;
-  border: 1px solid #cde0f4;
-  color: #1a4480;
-  padding: 12px 16px;
+.secondary-btn {
+  background: var(--hsa-white);
+  color: var(--hsa-navy);
+  border: 2px solid var(--hsa-navy);
+  padding: 10px 20px;
   border-radius: 4px;
-  font-size: 13px;
-  margin-bottom: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.secondary-btn:hover {
+  background: var(--hsa-navy);
+  color: var(--hsa-white);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .account-row {
+    grid-template-columns: 100px 1fr;
+  }
+  
+  .account-row-actions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  
+  .account-image {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .account-row-fields {
+    grid-template-columns: 1fr;
+  }
 }
