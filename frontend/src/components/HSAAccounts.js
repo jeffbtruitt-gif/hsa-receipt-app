@@ -262,108 +262,115 @@ function AccountRow({ account, onEdit, onToggleActive, onDelete, revealedPasswor
         <div className="account-row-header">
           <h3>{account.name}</h3>
           {!account.is_active && <span className="inactive-badge">Inactive</span>}
+          {account.website_url && account.is_active && (
+            <a 
+              href={account.website_url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="open-btn"
+              title="Open Website"
+            >
+              <ExternalLinkIcon /> Open
+            </a>
+          )}
         </div>
 
-        <div className="account-row-fields">
-          {account.website_url && (
-            <div className="account-row-field">
-              <label>Website</label>
-              <a href={account.website_url} target="_blank" rel="noopener noreferrer" className="link">
-                {account.website_url}
-              </a>
-            </div>
-          )}
-
-          {account.login_username && (
-            <div className="account-row-field">
-              <label>Username</label>
-              <div className="field-value">
-                <span>{account.login_username}</span>
-                <button 
-                  onClick={() => copyToClipboard(account.login_username)}
-                  className="icon-btn"
-                  title="Copy username"
-                >
-                  <CopyIcon />
-                </button>
+        <div className="account-row-content">
+          {/* Left Column - Login Info */}
+          <div className="account-row-left">
+            {account.website_url && (
+              <div className="account-row-field">
+                <label>Website</label>
+                <a href={account.website_url} target="_blank" rel="noopener noreferrer" className="link">
+                  {account.website_url}
+                </a>
               </div>
-            </div>
-          )}
+            )}
 
-          {account.password && (
-            <div className="account-row-field">
-              <label>Key</label>
-              <div className="field-value">
-                <span className="password-display">
-                  {isPasswordRevealed ? account.password : '••••••••••'}
-                </span>
-                <button 
-                  onClick={() => togglePasswordVisibility(account.id)}
-                  className="icon-btn"
-                  title={isPasswordRevealed ? 'Hide' : 'Show'}
-                >
-                  {isPasswordRevealed ? <EyeOffIcon /> : <EyeIcon />}
-                </button>
-                <button 
-                  onClick={() => copyToClipboard(account.password)}
-                  className="icon-btn"
-                  title="Copy"
-                >
-                  <CopyIcon />
-                </button>
+            {account.login_username && (
+              <div className="account-row-field">
+                <label>Username</label>
+                <div className="field-value">
+                  <span>{account.login_username}</span>
+                  <button 
+                    onClick={() => copyToClipboard(account.login_username)}
+                    className="icon-btn"
+                    title="Copy username"
+                  >
+                    <CopyIcon />
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {account.account_number && (
-            <div className="account-row-field">
-              <label>Account #</label>
-              <div className="field-value">
-                <span>{account.account_number}</span>
-                <button 
-                  onClick={() => copyToClipboard(account.account_number)}
-                  className="icon-btn"
-                  title="Copy"
-                >
-                  <CopyIcon />
-                </button>
+            {account.password && (
+              <div className="account-row-field">
+                <label>Key</label>
+                <div className="field-value">
+                  <span className="password-display">
+                    {isPasswordRevealed ? account.password : '••••••••••'}
+                  </span>
+                  <button 
+                    onClick={() => togglePasswordVisibility(account.id)}
+                    className="icon-btn"
+                    title={isPasswordRevealed ? 'Hide' : 'Show'}
+                  >
+                    {isPasswordRevealed ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
+                  <button 
+                    onClick={() => copyToClipboard(account.password)}
+                    className="icon-btn"
+                    title="Copy"
+                  >
+                    <CopyIcon />
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
+            {account.account_number && (
+              <div className="account-row-field">
+                <label>Account #</label>
+                <div className="field-value">
+                  <span>{account.account_number}</span>
+                  <button 
+                    onClick={() => copyToClipboard(account.account_number)}
+                    className="icon-btn"
+                    title="Copy"
+                  >
+                    <CopyIcon />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column - Notes */}
           {account.notes && (
-            <div className="account-row-field full-width">
-              <label>Notes</label>
-              <p className="account-notes">{account.notes}</p>
+            <div className="account-row-right">
+              <div className="account-row-field">
+                <label>Notes</label>
+                <p className="account-notes">{account.notes}</p>
+              </div>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Actions Section */}
-      <div className="account-row-actions">
-        {account.website_url && account.is_active && (
-          <a 
-            href={account.website_url} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="action-btn primary"
+        {/* Action buttons - bottom */}
+        <div className="account-row-actions">
+          <button onClick={() => onEdit(account)} className="action-btn">
+            Edit
+          </button>
+          <button 
+            onClick={() => onToggleActive(account)} 
+            className="action-btn"
           >
-            Visit Site
-          </a>
-        )}
-        <button onClick={() => onEdit(account)} className="action-btn secondary">
-          Edit
-        </button>
-        <button 
-          onClick={() => onToggleActive(account)} 
-          className="action-btn toggle"
-        >
-          {account.is_active ? 'Mark Inactive' : 'Mark Active'}
-        </button>
-        <button onClick={() => onDelete(account.id)} className="action-btn delete">
-          Delete
-        </button>
+            {account.is_active ? 'Mark Inactive' : 'Mark Active'}
+          </button>
+          <button onClick={() => onDelete(account.id)} className="action-btn delete">
+            Delete
+          </button>
+        </div>
       </div>
     </div>
   );
