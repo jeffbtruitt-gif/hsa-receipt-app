@@ -335,6 +335,23 @@ app.delete('/api/hsa-accounts/:id', verifyPassword, async (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
+app.get('/api/keep-alive', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('receipts')
+      .select('id')
+      .limit(1);
+
+    if (error) {
+      return res.status(500).json({ status: 'error', message: 'Supabase query failed', details: error.message });
+    }
+
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), db_connected: true });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`HSA Receipt App backend running on port ${PORT}`);
 });
