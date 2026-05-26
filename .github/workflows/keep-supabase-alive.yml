@@ -2,8 +2,8 @@ name: Keep Supabase Alive
 
 on:
   schedule:
-    # Runs every 5 days at 8:00 AM UTC to prevent Supabase free-tier pausing (7-day inactivity limit)
-    - cron: '0 8 */5 * *'
+    # Runs every 2 days at 8:00 AM UTC to prevent Supabase free-tier pausing (7-day inactivity limit)
+    - cron: '0 8 */2 * *'
   workflow_dispatch: # Allow manual trigger from GitHub UI
 
 jobs:
