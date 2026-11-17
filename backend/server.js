@@ -91,6 +91,7 @@ app.post('/api/login', (req, res) => {
 const CATEGORIES = ['Medical', 'Dental', 'Pharmacy', 'Vision', 'Mental Health', 'Physical Therapy', 'Chiropractic', 'Other'];
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
+const ANTHROPIC_FALLBACK_MODEL = 'claude-haiku-4-5';
 const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 const RECEIPT_TOOL = {
@@ -130,35 +131,49 @@ app.post('/api/receipts/analyze', upload.single('file'), verifyPassword, async (
     }
 
     const today = new Date().toISOString().slice(0, 10);
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: 1024,
-        tools: [RECEIPT_TOOL],
-        tool_choice: { type: 'tool', name: 'record_receipt' },
-        messages: [{
-          role: 'user',
-          content: [
-            fileBlock,
-            {
-              type: 'text',
-              text: `This is a receipt or medical bill to be saved for Health Savings Account (HSA) reimbursement. Today is ${today}. Read it and call record_receipt. Use the amount the patient paid or owes, the date of service (or purchase date), and pick the closest category. If the year is missing, assume the most recent past date.`,
-            },
-          ],
-        }],
-      }),
-    });
+    const callClaude = (model) =>
+      fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 1024,
+          tools: [RECEIPT_TOOL],
+          tool_choice: { type: 'tool', name: 'record_receipt' },
+          messages: [{
+            role: 'user',
+            content: [
+              fileBlock,
+              {
+                type: 'text',
+                text: `This is a receipt or medical bill to be saved for Health Savings Account (HSA) reimbursement. Today is ${today}. Read it and call record_receipt. Use the amount the patient paid or owes, the date of service (or purchase date), and pick the closest category. If the year is missing, assume the most recent past date.`,
+              },
+            ],
+          }],
+        }),
+      });
 
-    const body = await response.json();
+    let response = await callClaude(ANTHROPIC_MODEL);
+    let body = await response.json().catch(() => ({}));
+
+    // If the configured model is rejected (bad name / no access), retry once with the fallback.
+    if (!response.ok && [400, 403, 404].includes(response.status) && ANTHROPIC_MODEL !== ANTHROPIC_FALLBACK_MODEL) {
+      console.error('Anthropic error with', ANTHROPIC_MODEL, response.status, JSON.stringify(body));
+      response = await callClaude(ANTHROPIC_FALLBACK_MODEL);
+      body = await response.json().catch(() => ({}));
+    }
+
     if (!response.ok) {
-      console.error('Anthropic API error:', response.status, body);
-      return res.status(502).json({ error: 'Claude could not read this receipt. Try again or add it manually.' });
+      console.error('Anthropic API error:', response.status, JSON.stringify(body));
+      const apiMsg = body?.error?.message || `HTTP ${response.status}`;
+      let hint = '';
+      if (response.status === 401) hint = ' (API key is invalid — check ANTHROPIC_API_KEY on Render)';
+      else if (/credit|billing|balance/i.test(apiMsg)) hint = ' (add credits at console.anthropic.com → Billing)';
+      return res.status(502).json({ error: `Claude could not read this receipt: ${apiMsg}${hint}` });
     }
 
     const toolUse = (body.content || []).find((b) => b.type === 'tool_use');
