@@ -87,6 +87,100 @@ app.post('/api/login', (req, res) => {
   }
 });
 
+// CLAUDE RECEIPT SCAN
+const CATEGORIES = ['Medical', 'Dental', 'Pharmacy', 'Vision', 'Mental Health', 'Physical Therapy', 'Chiropractic', 'Other'];
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
+const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+const RECEIPT_TOOL = {
+  name: 'record_receipt',
+  description: 'Record the details of an HSA-eligible expense read from a receipt, invoice, EOB or statement.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      vendor_name: { type: 'string', description: 'Provider, pharmacy or merchant name as a person would recognize it, e.g. "CVS Pharmacy", "Lakeview Dental".' },
+      amount: { type: 'number', description: 'Amount the patient actually paid / owes (patient responsibility), in dollars. Not the billed amount before insurance.' },
+      expense_date: { type: 'string', description: 'Date of service or purchase in YYYY-MM-DD format.' },
+      category: { type: 'string', enum: CATEGORIES },
+      notes: { type: 'string', description: 'One short line describing what was purchased or the service, plus the patient name if shown. e.g. "Rx copay - amoxicillin (Cooper)". Under 120 characters.' },
+      confidence: { type: 'string', enum: ['high', 'medium', 'low'], description: 'How confident you are in the extracted values overall.' },
+      issues: { type: 'string', description: 'Anything the user should double-check (blurry total, multiple dates, unclear patient amount). Empty string if none.' },
+    },
+    required: ['vendor_name', 'amount', 'expense_date', 'category', 'notes', 'confidence', 'issues'],
+  },
+};
+
+app.post('/api/receipts/analyze', upload.single('file'), verifyPassword, async (req, res) => {
+  try {
+    if (!ANTHROPIC_API_KEY) {
+      return res.status(503).json({ error: 'Claude scanning is not configured (missing ANTHROPIC_API_KEY on the server).' });
+    }
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+
+    const mime = req.file.mimetype;
+    const data = req.file.buffer.toString('base64');
+    let fileBlock;
+    if (mime === 'application/pdf') {
+      fileBlock = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data } };
+    } else if (SUPPORTED_IMAGE_TYPES.includes(mime)) {
+      fileBlock = { type: 'image', source: { type: 'base64', media_type: mime, data } };
+    } else {
+      return res.status(400).json({ error: `Unsupported file type: ${mime}. Use a JPG, PNG or PDF.` });
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 1024,
+        tools: [RECEIPT_TOOL],
+        tool_choice: { type: 'tool', name: 'record_receipt' },
+        messages: [{
+          role: 'user',
+          content: [
+            fileBlock,
+            {
+              type: 'text',
+              text: `This is a receipt or medical bill to be saved for Health Savings Account (HSA) reimbursement. Today is ${today}. Read it and call record_receipt. Use the amount the patient paid or owes, the date of service (or purchase date), and pick the closest category. If the year is missing, assume the most recent past date.`,
+            },
+          ],
+        }],
+      }),
+    });
+
+    const body = await response.json();
+    if (!response.ok) {
+      console.error('Anthropic API error:', response.status, body);
+      return res.status(502).json({ error: 'Claude could not read this receipt. Try again or add it manually.' });
+    }
+
+    const toolUse = (body.content || []).find((b) => b.type === 'tool_use');
+    if (!toolUse) return res.status(502).json({ error: 'Claude did not return receipt details.' });
+
+    const r = toolUse.input || {};
+    const amount = Number(r.amount);
+    res.json({
+      vendor_name: r.vendor_name || '',
+      amount: Number.isFinite(amount) ? amount.toFixed(2) : '',
+      expense_date: /^\d{4}-\d{2}-\d{2}$/.test(r.expense_date || '') ? r.expense_date : '',
+      category: CATEGORIES.includes(r.category) ? r.category : 'Other',
+      notes: r.notes || '',
+      confidence: r.confidence || 'medium',
+      issues: r.issues || '',
+    });
+  } catch (err) {
+    console.error('Analyze failed:', err);
+    res.status(500).json({ error: 'Receipt scan failed', details: err.message });
+  }
+});
+
 // RECEIPTS
 app.post('/api/receipts', upload.single('file'), verifyPassword, async (req, res) => {
   try {
@@ -183,7 +277,7 @@ app.delete('/api/receipts/:id', verifyPassword, async (req, res) => {
 });
 
 app.get('/api/categories', verifyPassword, (req, res) => {
-  res.json(['Medical', 'Dental', 'Pharmacy', 'Vision', 'Mental Health', 'Physical Therapy', 'Chiropractic', 'Other']);
+  res.json(CATEGORIES);
 });
 
 app.get('/api/stats', verifyPassword, async (req, res) => {
