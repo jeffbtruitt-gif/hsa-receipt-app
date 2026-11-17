@@ -143,14 +143,14 @@ app.post('/api/receipts/analyze', upload.single('file'), verifyPassword, async (
           model,
           max_tokens: 1024,
           tools: [RECEIPT_TOOL],
-          tool_choice: { type: 'tool', name: 'record_receipt' },
+          tool_choice: { type: 'auto' },
           messages: [{
             role: 'user',
             content: [
               fileBlock,
               {
                 type: 'text',
-                text: `This is a receipt or medical bill to be saved for Health Savings Account (HSA) reimbursement. Today is ${today}. Read it and call record_receipt. Use the amount the patient paid or owes, the date of service (or purchase date), and pick the closest category. If the year is missing, assume the most recent past date.`,
+                text: `This is a receipt or medical bill to be saved for Health Savings Account (HSA) reimbursement. Today is ${today}. Read it and call the record_receipt tool exactly once (do not reply with text). Use the amount the patient paid or owes, the date of service (or purchase date), and pick the closest category. If the year is missing, assume the most recent past date.`,
               },
             ],
           }],
@@ -177,9 +177,17 @@ app.post('/api/receipts/analyze', upload.single('file'), verifyPassword, async (
     }
 
     const toolUse = (body.content || []).find((b) => b.type === 'tool_use');
-    if (!toolUse) return res.status(502).json({ error: 'Claude did not return receipt details.' });
-
-    const r = toolUse.input || {};
+    let r = toolUse ? toolUse.input : null;
+    if (!r) {
+      // Fallback: Claude answered in text — pull out a JSON object if present.
+      const text = (body.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+      const match = text.match(/\{[\s\S]*\}/);
+      try { r = match ? JSON.parse(match[0]) : null; } catch (e) { r = null; }
+    }
+    if (!r) {
+      console.error('No tool_use in Claude response:', JSON.stringify(body));
+      return res.status(502).json({ error: 'Claude did not return receipt details. Try again or add it manually.' });
+    }
     const amount = Number(r.amount);
     res.json({
       vendor_name: r.vendor_name || '',
